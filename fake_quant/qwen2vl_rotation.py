@@ -83,8 +83,12 @@ def fuse_qwen2vl_layer_norms(model, args):
         )
 
     if not args.no_fuse_llm:
-        # fuse internvl2-8b
-        for layer in model.model.model.layers:
+        # fuse qwen2vl - handle both structures
+        if hasattr(model.model.model, 'language_model'):
+            layers = model.model.model.language_model.layers
+        else:
+            layers = model.model.model.layers
+        for layer in layers:
             fuse_ln_linear(
                 layer.input_layernorm,
                 [
@@ -98,7 +102,11 @@ def fuse_qwen2vl_layer_norms(model, args):
             )
 
         # 最后一个rmsnorm需要和ln_head合并
-        fuse_ln_linear(model.model.model.norm, [model.model.lm_head])
+        if hasattr(model.model.model, 'language_model'):
+            norm = model.model.model.language_model.norm
+        else:
+            norm = model.model.model.norm
+        fuse_ln_linear(norm, [model.model.lm_head])
 
 
 def rotate_qwen2vl_attention_inputs(layer, Q, is_visual=False) -> None:
@@ -210,10 +218,15 @@ def rotate_visual_merger(model, Q: torch.Tensor) -> None:
 
 
 def rotate_qwen2vl_embeddings(model, Q) -> None:
-    Q = Q.to(model.model.embed_tokens.weight.device)
-    dtype = model.model.embed_tokens.weight.data.dtype
-    W_ = model.model.embed_tokens.weight.data.to(dtype=torch.float64)
-    model.model.embed_tokens.weight.data = torch.matmul(W_, Q).to(dtype=dtype)
+    # Handle both model structures
+    if hasattr(model, 'language_model'):
+        embed_tokens = model.language_model.embed_tokens
+    else:
+        embed_tokens = model.embed_tokens
+    Q = Q.to(embed_tokens.weight.device)
+    dtype = embed_tokens.weight.data.dtype
+    W_ = embed_tokens.weight.data.to(dtype=torch.float64)
+    embed_tokens.weight.data = torch.matmul(W_, Q).to(dtype=dtype)
 
     Q = Q.to(model.visual.merger.mlp[2].weight.device)
     W_ = model.visual.merger.mlp[2].weight.data.to(dtype=torch.float64)
@@ -317,8 +330,13 @@ def rotate_qwen2vl_model(model, args):
         rotate_qwen2vl_embeddings(model, Q)
         rotate_qwen2vl_head(model, Q)
         utils.cleanup_memory()
+        # Handle both model structures
+        if hasattr(model, 'language_model'):
+            llm_layers = model.language_model.layers
+        else:
+            llm_layers = model.layers
         for idx, layer in enumerate(
-            tqdm.tqdm(model.model.layers, unit="layer", desc="LLM Rotating")
+            tqdm.tqdm(llm_layers, unit="layer", desc="LLM Rotating")
         ):
             layer_device = next(layer.parameters()).device
             Q = Q.to(layer_device)

@@ -9,6 +9,8 @@ from fake_quant import utils
 from fake_quant import hadamard_utils
 from fake_quant.qwen2vl_rotation import fuse_qwen2vl_layer_norms, rotate_qwen2vl_model
 from vlmeval.config import supported_VLM
+from vlmeval.dataset.image_vqa import OCRBench
+from vlmeval.smp import load, osp
 
 torch.set_grad_enabled(False)
 
@@ -21,10 +23,30 @@ def init_logger(args):
     logger.add(logger_file)
 
 Model_Setting = {
-    "Qwen2-VL-2B-Instruct": "weights/Qwen2-VL-2B-Instruct",
-    "Qwen2-VL-7B-Instruct": "weights/Qwen2-VL-7B-Instruct",
-    "Qwen2-VL-72B-Instruct": "weights/Qwen2-VL-72B-Instruct",
+    "Qwen2-VL-2B-Instruct": "Qwen/Qwen2-VL-2B-Instruct",
+    "Qwen2-VL-7B-Instruct": "Qwen/Qwen2-VL-7B-Instruct",
+    "Qwen2-VL-72B-Instruct": "Qwen/Qwen2-VL-72B-Instruct",
 }
+
+class LocalOCRBench(OCRBench):
+    """Custom OCRBench dataset that loads from a local TSV file."""
+    def __init__(self, dataset="OCRBench", local_file=None, **kwargs):
+        self.local_file = local_file
+        # Call parent __init__ which will call our overridden load_data
+        super().__init__(dataset=dataset, **kwargs)
+    
+    def load_data(self, dataset):
+        if self.local_file and osp.exists(self.local_file):
+            # Load directly from local file
+            data = load(self.local_file)
+            # Keep header (row 0) and first 2 data rows (rows 1-2)
+            # This means indices 0, 1, 2 (header + 2 data rows)
+            if len(data) > 2:
+                data = data.iloc[:3]  # Header + 2 data rows
+            return data
+        else:
+            # Fall back to default OCRBench behavior
+            return super().load_data(dataset)
 
 def main(args):
     model_name = args.model_name
@@ -34,7 +56,7 @@ def main(args):
 
     if model_name == "Qwen2-VL-2B-Instruct":
         # 深拷贝输入嵌入层权重（断开内存关联）
-        new_output_weight = model.model.model.embed_tokens.weight.clone().detach() 
+        new_output_weight = model.model.model.language_model.embed_tokens.weight.clone().detach() 
         
         # 重新初始化输出层权重
         model.model.lm_head  = torch.nn.Linear( 
@@ -149,6 +171,10 @@ def main(args):
             # from torch.utils.data import ConcatDataset
             from vlmeval.dataset import build_dataset
 
+            # Use local dataset file if provided
+            if args.local_dataset_file:
+                dataset = LocalOCRBench(dataset=args.dataset_name, local_file=args.local_dataset_file)
+            else:
             dataset = build_dataset(args.dataset_name)
             model.set_dump_image(dataset.dump_image)
 
@@ -210,6 +236,10 @@ def main(args):
 
     from vlmeval.dataset import build_dataset
 
+    # Use local dataset file if provided
+    if args.local_dataset_file:
+        dataset = LocalOCRBench(dataset=args.dataset_name, local_file=args.local_dataset_file)
+    else:
     dataset = build_dataset(args.dataset_name)
 
     model.set_dump_image(dataset.dump_image)
@@ -501,6 +531,12 @@ if __name__ == "__main__":
         type=str,
         default="TextVQA_VAL",
         help="dataset name",
+    )
+    parser.add_argument(
+        "--local_dataset_file",
+        type=str,
+        default=None,
+        help="Path to local TSV file to use instead of downloading dataset",
     )
     parser.add_argument(
         "--analysis_text",

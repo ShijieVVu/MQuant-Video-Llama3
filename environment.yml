@@ -179,7 +179,7 @@ dependencies:
       - anyio==3.7.1
       - async-timeout==4.0.3
       - attrs==24.2.0
-      - autoawq==0.2.6+cu121
+      - autoawq==0.2.6
       - autoawq-kernels==0.0.8
       - black==24.8.0
       - blessed==1.20.0
