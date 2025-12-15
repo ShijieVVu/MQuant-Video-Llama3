@@ -47,6 +47,7 @@ from .video_llm import (
     LLaMAVID,
     VideoChat2_HD,
     PLLaVA,
+    VideoLLaMA3,
 )
 from .vila import VILA
 from .ovis import Ovis

@@ -33,6 +33,7 @@ from .slidevqa import SlideVQA
 from .mmbench_video import MMBenchVideo
 from .text_mcq import CustomTextMCQDataset, TextMCQDataset
 from .videomme import VideoMME
+from .videoeoc import VideoEOC
 from .mvbench import MVBench, MVBench_MP4
 from .utils import *
 from ..smp import *
@@ -152,7 +153,7 @@ IMAGE_DATASET = [
     HRBenchDataset,
 ]
 
-VIDEO_DATASET = [MMBenchVideo, VideoMME, MVBench, MVBench_MP4]
+VIDEO_DATASET = [MMBenchVideo, VideoMME, VideoEOC, MVBench, MVBench_MP4]
 
 TEXT_DATASET = [TextMCQDataset]
 

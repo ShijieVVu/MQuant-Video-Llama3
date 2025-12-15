@@ -500,6 +500,10 @@ qwen2vl_series = {
         min_pixels=512 * 28 * 28,
         max_pixels=16384 * 28 * 28,
     ),
+    "VideoLLaMA3-7B": partial(
+        VideoLLaMA3,
+        model_path="DAMO-NLP-SG/VideoLLaMA3-7B",
+    ),
     "Qwen2-VL-7B-Instruct": partial(
         Qwen2VLChat,
         model_path="Qwen/Qwen2-VL-7B-Instruct",
